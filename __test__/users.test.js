@@ -3,7 +3,12 @@ const request = require("supertest");
 const db = require("../db");
 const app = require("../app");
 
-const { hashPassword, generateToken, getUsers } = require("../common");
+const {
+  hashPassword,
+  generateToken,
+  getUsers,
+  createUser,
+} = require("../common");
 
 const auth = {
   userAdmin: {},
@@ -98,7 +103,7 @@ describe("GET /api/users", () => {
 
 // If user is admin show other user
 describe("GET /api/users/:id", () => {
-  test("Request as Admin, reponse return normal user", async () => {
+  test("Request as Admin, response return normal user", async () => {
     const response = await request(app)
       .get(`/api/users/${auth.userNormal.current_user_id}`)
       .set("Authorization", auth.userAdmin.token);
@@ -110,7 +115,7 @@ describe("GET /api/users/:id", () => {
 
 // Show user if logged in user is user
 describe("GET /api/users/:id", () => {
-  test("Request as normal user for normal user id, reponse return normal user", async () => {
+  test("Request as normal user for normal user id, response return normal user", async () => {
     const response = await request(app)
       .get(`/api/users/${auth.userNormal.current_user_id}`)
       .set("Authorization", auth.userNormal.token);
@@ -122,7 +127,7 @@ describe("GET /api/users/:id", () => {
 
 // Get another user detail for normal user
 describe("GET /api/users/:id", () => {
-  test("Request as nomalUser for other user ,reponse return error", async () => {
+  test("Request as nomalUser for other user ,response return error", async () => {
     const response = await request(app)
       .get(`/api/users/${auth.userAdmin.current_user_id}`)
       .set("Authorization", auth.userNormal.token);
@@ -134,7 +139,7 @@ describe("GET /api/users/:id", () => {
 
 // Without Auth request user
 describe("GET /api/users/:id", () => {
-  test("Request without auth for user ,reponse return error", async () => {
+  test("Request without auth for user ,response return error", async () => {
     const response = await request(app).get(
       `/api/users/${auth.userNormal.current_user_id}`
     );
@@ -216,7 +221,7 @@ describe("PATCH /api/users/:id", () => {
 
 // Try Updating normal user by another user
 describe("PATCH /api/users/:id", () => {
-  test("Trying Updating user info by admin user, reponse return error", async () => {
+  test("Trying Updating user info by admin user, response return error", async () => {
     const hashedPassword = await hashPassword("password");
     const newUser = await db.query(
       "INSERT INTO users (username, password) VALUES ($1, $2) RETURNING *",
@@ -338,5 +343,55 @@ describe("DELETE /api/users/:id", () => {
 
     expect(response.statusCode).toBe(401);
     expect(response.body.message).toBe("unauthorized");
+  });
+});
+
+// Create User
+describe("POST /api/users", () => {
+  test("Creating New User from Api", async () => {
+    const hashedPassword = await hashPassword("secret");
+    const response = await request(app)
+      .post("/api/users")
+      .send({ username: "newUser", password: hashedPassword });
+
+    expect(response.body.username).toBe("newUser");
+    expect(response.headers.authorization).toBe(response.body.access_token);
+    expect(response.statusCode).toBe(201);
+  });
+});
+
+// Login User with Correct Details
+describe("POST /api/users/login", () => {
+  test("Logging User with correct id and password, response return header and body with token", async () => {
+    const plainPassword = "secret";
+    const hashedPassword = await hashPassword(plainPassword);
+    const user = await createUser("test", hashedPassword);
+
+    // Login User
+    const response = await request(app)
+      .post("/api/users/login")
+      .send({ username: "test", password: plainPassword });
+
+    expect(response.body.token);
+    expect(response.headers.authorization).toBe(response.body.token);
+    expect(response.statusCode).toBe(200);
+  });
+});
+
+// Logging User with Wrong Credentials
+describe("POST /api/users/login", () => {
+  test("Logging User with Credentials, response return message unauthorized", async () => {
+    const plainPassword = "secret";
+    const otherPassword = "secret1";
+    const hashedPassword = await hashPassword(plainPassword);
+    const user = await createUser("test", hashedPassword);
+
+    // Login User
+    const response = await request(app)
+      .post("/api/users/login")
+      .send({ username: "test", password: otherPassword });
+
+    expect(response.body.message).toBe("unauthorized");
+    expect(response.statusCode).toBe(400);
   });
 });

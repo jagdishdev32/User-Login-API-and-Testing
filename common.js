@@ -9,7 +9,7 @@ module.exports = {
     const hashedPassword = await bcrypt.hash(plainPassword, 1);
     return hashedPassword;
   },
-  generateToken: async (user_id, isadmin) => {
+  generateToken: async (user_id, isadmin = false) => {
     const token = await jwt.sign({ user_id, isadmin }, TOKEN_SECRET);
     return token;
   },
@@ -47,6 +47,13 @@ module.exports = {
     const user = await db.query("SELECT * FROM users WHERE id=$1", [id]);
     return user.rows;
   },
+  createUser: async (username, hashedPassword) => {
+    const user = await db.query(
+      "INSERT INTO users (username, password) VALUES ($1, $2) RETURNING *",
+      [username, hashedPassword]
+    );
+    return user.rows[0];
+  },
   updateUser: async (id, username, password) => {
     let user, hashedPassword;
     //TODO replace manual hash change to change with function
@@ -72,5 +79,13 @@ module.exports = {
     }
 
     return user.rows[0];
+  },
+  checkPassword: async (plainPass, hashedPassword) => {
+    try {
+      const check = await bcrypt.compare(plainPass, hashedPassword);
+      return check;
+    } catch (error) {
+      return error.message;
+    }
   },
 };

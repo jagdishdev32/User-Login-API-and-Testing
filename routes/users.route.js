@@ -7,6 +7,9 @@ const {
   verifyToken,
   getUser,
   updateUser,
+  createUser,
+  generateToken,
+  checkPassword,
 } = require("../common");
 
 // METH   GET  /
@@ -114,6 +117,50 @@ router.delete("/:id", async (req, res) => {
     }
   }
   return res.status(401).json({ message: "unauthorized" });
+});
+
+// METH   POST  /
+// DESC   Create New User
+// ACCESS public
+router.post("/", async (req, res) => {
+  const { username, password } = req.body;
+
+  if (username && password) {
+    const hashedPassword = await hashPassword(password);
+    const user = await createUser(username, hashedPassword);
+
+    const token = await generateToken(user.id);
+    return res.status(201).setHeader("authorization", token).json({
+      username: user.username,
+      access_token: token,
+    });
+  }
+  return res.status(400).json({ message: "Username or Password is Invalid" });
+});
+
+router.post("/login", async (req, res) => {
+  const { username, password } = req.body;
+
+  if (username && password) {
+    const user = await db.query("SELECT * FROM users WHERE username = $1", [
+      username,
+    ]);
+
+    const hashedPassword = user.rows[0].password;
+    const samePassword = await checkPassword(password, hashedPassword);
+
+    if (samePassword) {
+      const token = await generateToken(user.rows[0].id);
+
+      return res
+        .status(200)
+        .setHeader("authorization", token)
+        .json({ token: token });
+    }
+
+    return res.status(400).json({ message: "unauthorized" });
+  }
+  return res.status(400).json({ message: "Username or Password is Invalid" });
 });
 
 module.exports = router;
