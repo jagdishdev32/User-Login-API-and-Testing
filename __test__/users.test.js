@@ -3,7 +3,7 @@ const request = require("supertest");
 const db = require("../db");
 const app = require("../app");
 
-const { hashPassword, generateToken } = require("../common");
+const { hashPassword, generateToken, getUsers } = require("../common");
 
 const auth = {
   userAdmin: {},
@@ -120,7 +120,7 @@ describe("GET /api/users/:id", () => {
   });
 });
 
-// User is another user or user is not admin
+// Get another user detail for normal user
 describe("GET /api/users/:id", () => {
   test("Request as nomalUser for other user ,reponse return error", async () => {
     const response = await request(app)
@@ -154,8 +154,10 @@ describe("PATCH /api/users/:id", () => {
     );
 
     // Make sure user created successfully
-    expect(newUser.rows[0].username).toBe("user");
-    expect(newUser.rows[0].password).toBe(hashedPassword);
+    let users = await getUsers();
+    expect(users.length).toBe(3);
+    expect(users[users.length - 1].username).toBe("user");
+    expect(users[users.length - 1].password).toBe(hashedPassword);
 
     auth.other.newUser = newUser.rows[0];
 
@@ -191,8 +193,10 @@ describe("PATCH /api/users/:id", () => {
     );
 
     // Make sure user created successfully
-    expect(newUser.rows[0].username).toBe("user");
-    expect(newUser.rows[0].password).toBe(hashedPassword);
+    let users = await getUsers();
+    expect(users.length).toBe(3);
+    expect(users[users.length - 1].username).toBe("user");
+    expect(users[users.length - 1].password).toBe(hashedPassword);
 
     auth.other.newUser = newUser.rows[0];
 
@@ -220,8 +224,10 @@ describe("PATCH /api/users/:id", () => {
     );
 
     // Make sure user created successfully
-    expect(newUser.rows[0].username).toBe("user");
-    expect(newUser.rows[0].password).toBe(hashedPassword);
+    let users = await getUsers();
+    expect(users.length).toBe(3);
+    expect(users[users.length - 1].username).toBe("user");
+    expect(users[users.length - 1].password).toBe(hashedPassword);
 
     auth.other.newUser = newUser.rows[0];
 
@@ -233,6 +239,102 @@ describe("PATCH /api/users/:id", () => {
         username: "newUsername",
         password: "secret",
       });
+
+    expect(response.statusCode).toBe(401);
+    expect(response.body.message).toBe("unauthorized");
+  });
+});
+
+// Deleting User
+
+// Deleting User
+describe("DELETE /api/users/:id", () => {
+  test("Deleting user", async () => {
+    // Creating New User
+    const hashedPassword = await hashPassword("password");
+    const newUser = await db.query(
+      "INSERT INTO users (username, password) VALUES ($1, $2) RETURNING *",
+      ["user", hashedPassword]
+    );
+
+    // Make sure user created successfully
+    let users = await getUsers();
+    expect(users.length).toBe(3);
+    expect(users[users.length - 1].username).toBe("user");
+    expect(users[users.length - 1].password).toBe(hashedPassword);
+
+    auth.other.newUser = newUser.rows[0];
+
+    // Generate Token for login
+    const newUserToken = await generateToken(
+      auth.other.newUser.id,
+      auth.other.newUser.isadmin
+    );
+
+    // Deleting User
+    const response = await request(app)
+      .delete(`/api/users/${newUser.rows[0].id}`)
+      .set("Authorization", newUserToken);
+
+    // expect(response.statusCode).toBe(204);
+    expect(response.body.message).toBe("Deleted...");
+
+    // Make sure user deleted successfully
+    users = await getUsers();
+    expect(users.length).toBe(2);
+  });
+});
+
+// Deleted User by admin
+describe("DELETE /api/users/:id", () => {
+  test("Deleted user by admin", async () => {
+    // Creating New User
+    const hashedPassword = await hashPassword("password");
+    const newUser = await db.query(
+      "INSERT INTO users (username, password) VALUES ($1, $2) RETURNING *",
+      ["user", hashedPassword]
+    );
+
+    // Make sure user created successfully
+    let users = await getUsers();
+    expect(users.length).toBe(3);
+    expect(users[users.length - 1].username).toBe("user");
+    expect(users[users.length - 1].password).toBe(hashedPassword);
+
+    // Deleting User
+    const response = await request(app)
+      .delete(`/api/users/${newUser.rows[0].id}`)
+      .set("Authorization", auth.userAdmin.token);
+
+    // expect(response.statusCode).toBe(204);
+    expect(response.body.message).toBe("Deleted...");
+
+    // Make sure user deleted successfully
+    users = await getUsers();
+    expect(users.length).toBe(2);
+  });
+});
+
+// Trying Deleting User from Another user
+describe("DELETE /api/users/:id", () => {
+  test("Trying Deleting User from another normal user, response return message unauthorized", async () => {
+    // Creating New User
+    const hashedPassword = await hashPassword("password");
+    const newUser = await db.query(
+      "INSERT INTO users (username, password) VALUES ($1, $2) RETURNING *",
+      ["user", hashedPassword]
+    );
+
+    // Make sure user created successfully
+    let users = await getUsers();
+    expect(users.length).toBe(3);
+    expect(users[users.length - 1].username).toBe("user");
+    expect(users[users.length - 1].password).toBe(hashedPassword);
+
+    // Deleting User
+    const response = await request(app)
+      .delete(`/api/users/${newUser.rows[0].id}`)
+      .set("Authorization", auth.userNormal.token);
 
     expect(response.statusCode).toBe(401);
     expect(response.body.message).toBe("unauthorized");

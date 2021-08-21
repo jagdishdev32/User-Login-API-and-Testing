@@ -85,4 +85,35 @@ router.patch("/:id", async (req, res) => {
   return res.status(401).json({ message: "unauthorized" });
 });
 
+// METH   patch  /:id
+// DESC   Update user info
+// ACCESS private (admin or same user only)
+router.delete("/:id", async (req, res) => {
+  const token = req.headers.authorization;
+  const { id } = req.params;
+
+  if (token) {
+    const verify = await verifyToken(token);
+
+    if (verify) {
+      if (verify.isadmin == true || verify.user_id == id) {
+        // return res.json({ ...verify, id: id });
+        // Deleting User
+        const user = await db.query(
+          "DELETE FROM users WHERE id=$1 RETURNING *",
+          [id]
+        );
+        // return res.json(user.rows);
+        if (user.rows.length > 0) {
+          // Cannot send data after 204 status
+          // return res.status(204).json({ message: "Deleted..." });
+          return res.status(200).json({ message: "Deleted..." });
+        }
+        return res.status(200).json({ message: "Invalid Id" });
+      }
+    }
+  }
+  return res.status(401).json({ message: "unauthorized" });
+});
+
 module.exports = router;
