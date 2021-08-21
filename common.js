@@ -43,4 +43,30 @@ module.exports = {
     const user = await db.query("SELECT * FROM users WHERE id=$1", [id]);
     return user.rows;
   },
+  updateUser: async (id, username, password) => {
+    let user, hashedPassword;
+    //TODO replace manual hash change to change with function
+    hashedPassword = await bcrypt.hash(password, 1);
+
+    if (username && password) {
+      // hashedPassword = await this.hashPassword(password);
+      user = await db.query(
+        "UPDATE users SET username=$1, password=$2 where id=$3 RETURNING *",
+        [username, hashedPassword, id]
+      );
+    } else if (username) {
+      user = await db.query(
+        "UPDATE users SET username=$1 where id=$2 RETURNING *",
+        [username, id]
+      );
+    } else if (password) {
+      // hashedPassword = await this.hashPassword(password);
+      user = await db.query(
+        "UPDATE users SET password=$1 where id=$2 RETURNING *",
+        [hashedPassword, id]
+      );
+    }
+
+    return user.rows[0];
+  },
 };

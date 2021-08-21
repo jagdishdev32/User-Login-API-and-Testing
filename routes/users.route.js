@@ -1,7 +1,13 @@
 const db = require("../db");
 const router = require("express").Router();
 
-const { hashPassword, isLoggedIn, verifyToken, getUser } = require("../common");
+const {
+  hashPassword,
+  isLoggedIn,
+  verifyToken,
+  getUser,
+  updateUser,
+} = require("../common");
 
 // METH   GET  /
 // DESC   Get all users
@@ -28,9 +34,9 @@ router.get("/", async (req, res) => {
   return res.status(401).json({ message: "unauthorized" });
 });
 
-// METH   GET  /
-// DESC   Get all users
-// ACCESS private (admin only)
+// METH   GET  /:id
+// DESC   Get user info
+// ACCESS private (admin or same user only)
 router.get("/:id", async (req, res) => {
   const token = req.headers.authorization;
   const { id } = req.params;
@@ -45,6 +51,34 @@ router.get("/:id", async (req, res) => {
         if (users) {
           return res.status(200).json({ ...users[0], password: undefined });
         }
+      }
+    }
+  }
+  return res.status(401).json({ message: "unauthorized" });
+});
+
+// METH   patch  /:id
+// DESC   Update user info
+// ACCESS private (admin or same user only)
+router.patch("/:id", async (req, res) => {
+  const token = req.headers.authorization;
+  const { id } = req.params;
+
+  const { username, password } = req.body;
+
+  if (token) {
+    const verify = await verifyToken(token);
+
+    if (verify) {
+      if (verify.isadmin == true || verify.user_id == id) {
+        if (username || password) {
+          const user = await updateUser(id, username, password);
+          return res.status(201).json({ ...user });
+          // return res.status(201).json(user);
+        }
+        return res
+          .status(200)
+          .json({ message: "username or password is required" });
       }
     }
   }

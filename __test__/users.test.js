@@ -8,6 +8,7 @@ const { hashPassword, generateToken } = require("../common");
 const auth = {
   userAdmin: {},
   userNormal: {},
+  other: {},
 };
 
 beforeAll(async () => {
@@ -140,5 +141,100 @@ describe("GET /api/users/:id", () => {
 
     expect(response.body.message).toBe("unauthorized");
     expect(response.statusCode).toBe(401);
+  });
+});
+
+// Update User Info
+describe("PATCH /api/users/:id", () => {
+  test("Updating same user info", async () => {
+    const hashedPassword = await hashPassword("password");
+    const newUser = await db.query(
+      "INSERT INTO users (username, password) VALUES ($1, $2) RETURNING *",
+      ["user", hashedPassword]
+    );
+
+    // Make sure user created successfully
+    expect(newUser.rows[0].username).toBe("user");
+    expect(newUser.rows[0].password).toBe(hashedPassword);
+
+    auth.other.newUser = newUser.rows[0];
+
+    // Generate Token for login
+    const newUserToken = await generateToken(
+      auth.other.newUser.id,
+      auth.other.newUser.isadmin
+    );
+
+    // console.log(newUser.rows, newUserToken);
+
+    // Update Values
+    const response = await request(app)
+      .patch(`/api/users/${newUser.rows[0].id}`)
+      .set("Authorization", newUserToken)
+      .send({
+        username: "newUsername",
+        password: "secret",
+      });
+
+    expect(response.statusCode).toBe(201);
+    expect(response.body.username).toBe("newUsername");
+  });
+});
+
+// Updating Normal User Info by admin user
+describe("PATCH /api/users/:id", () => {
+  test("Updating user info by admin user", async () => {
+    const hashedPassword = await hashPassword("password");
+    const newUser = await db.query(
+      "INSERT INTO users (username, password) VALUES ($1, $2) RETURNING *",
+      ["user", hashedPassword]
+    );
+
+    // Make sure user created successfully
+    expect(newUser.rows[0].username).toBe("user");
+    expect(newUser.rows[0].password).toBe(hashedPassword);
+
+    auth.other.newUser = newUser.rows[0];
+
+    // Update Values
+    const response = await request(app)
+      .patch(`/api/users/${newUser.rows[0].id}`)
+      .set("Authorization", auth.userAdmin.token)
+      .send({
+        username: "newUsername",
+        password: "secret",
+      });
+
+    expect(response.statusCode).toBe(201);
+    expect(response.body.username).toBe("newUsername");
+  });
+});
+
+// Try Updating normal user by another user
+describe("PATCH /api/users/:id", () => {
+  test("Trying Updating user info by admin user, reponse return error", async () => {
+    const hashedPassword = await hashPassword("password");
+    const newUser = await db.query(
+      "INSERT INTO users (username, password) VALUES ($1, $2) RETURNING *",
+      ["user", hashedPassword]
+    );
+
+    // Make sure user created successfully
+    expect(newUser.rows[0].username).toBe("user");
+    expect(newUser.rows[0].password).toBe(hashedPassword);
+
+    auth.other.newUser = newUser.rows[0];
+
+    // Update Values
+    const response = await request(app)
+      .patch(`/api/users/${newUser.rows[0].id}`)
+      .set("Authorization", auth.userNormal.token)
+      .send({
+        username: "newUsername",
+        password: "secret",
+      });
+
+    expect(response.statusCode).toBe(401);
+    expect(response.body.message).toBe("unauthorized");
   });
 });
